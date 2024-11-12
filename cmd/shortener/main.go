@@ -49,7 +49,7 @@ func shortURLPost(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusTemporaryRedirect)
 		}
 		w.WriteHeader(http.StatusCreated)
-		fmt.Fprintln(w, `http://localhost:8080`+link)
+		fmt.Fprint(w, `http://localhost:8080`+link)
 	}
 }
 
