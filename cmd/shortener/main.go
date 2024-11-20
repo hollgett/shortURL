@@ -17,7 +17,7 @@ func newRouters() *Routers {
 	}
 }
 
-func (r *Routers) randomID() string {
+func (rtr *Routers) randomID() string {
 	//create random URL path
 	shortLink := make([]byte, 8)
 	for i := range shortLink {
@@ -28,8 +28,8 @@ func (r *Routers) randomID() string {
 		}
 	}
 	// search exist link
-	if _, ok := r.routes[string(shortLink)]; ok {
-		return r.randomID()
+	if _, ok := rtr.routes[string(shortLink)]; ok {
+		return rtr.randomID()
 	} else {
 		return string(shortLink)
 	}
