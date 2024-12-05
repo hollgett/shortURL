@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hollgett/shortURL.git/internal/app"
+	"github.com/hollgett/shortURL.git/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,9 +27,13 @@ func Test_shortURLmiddleware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			repo := repository.NewStorage()
+			short := app.NewShortenerHandler(repo)
+			api := NewHandlerAPI(short)
+
 			r := httptest.NewRequest(tt.method, `/`, nil)
 			w := httptest.NewRecorder()
-			h := shortURLmiddleware(&Routers{})
+			h := api.ShortURLmiddleware()
 			h(w, r)
 			assert.Equal(t, tt.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
 		})
@@ -71,11 +77,15 @@ func TestRouters_shortURLPost(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rtr := newRouters()
+			repo := repository.NewStorage()
+			short := app.NewShortenerHandler(repo)
+			api := NewHandlerAPI(short)
+
 			r := httptest.NewRequest(http.MethodPost, `/`, bytes.NewBuffer([]byte(tt.request)))
 			w := httptest.NewRecorder()
 			r.Header.Set("Content-Type", tt.want.contentType)
-			rtr.shortURLPost(w, r)
+
+			api.shortURLPost(w, r)
 			result := w.Result()
 			defer result.Body.Close()
 			assert.Equal(t, tt.want.expectedCode, result.StatusCode, "Код ответа не совпадает с ожидаемым")
@@ -85,8 +95,8 @@ func TestRouters_shortURLPost(t *testing.T) {
 				res, err := io.ReadAll(result.Body)
 				require.NoError(t, err, "Тело запроса имеет ошибку")
 				link := strings.Replace(string(res), "http://localhost:8080/", "", -1)
-				assert.Contains(t, rtr.routes, link, "Ответ не совпадает данными")
-				assert.Equal(t, rtr.routes[link], tt.request, "Передаваемый ответ не совпадает с ожидаемым")
+				r, _ := repo.Find(link)
+				assert.Equal(t, r, tt.request, "Передаваемый ответ не совпадает с ожидаемым")
 			}
 		})
 	}
@@ -99,16 +109,14 @@ func TestRouters_shortURLGet(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rtr     *Routers
+		data    map[string]string
 		request string
 		want    want
 	}{
 		{
 			name: "Positive test #1",
-			rtr: &Routers{
-				map[string]string{
-					"gg": "https://go.dev/",
-				},
+			data: map[string]string{
+				"gg": "https://go.dev/",
 			},
 			request: `/gg`,
 			want: want{
@@ -118,18 +126,16 @@ func TestRouters_shortURLGet(t *testing.T) {
 		},
 		{
 			name: "Positive test with a lot of routers #2",
-			rtr: &Routers{
-				map[string]string{
-					"gg":    "https://go.dev1/",
-					"ggg":   "https://go.dev2/",
-					"gggg":  "https://go.de3v/",
-					"gggd":  "https://go.dev4/",
-					"ggh":   "https://go.dev5/",
-					"gggj":  "https://go.dev6/",
-					"ggdgd": "https://go.dev7/",
-					"gggh":  "https://go.dev8/",
-					"ggjgj": "https://go.dev9/",
-				},
+			data: map[string]string{
+				"gggdsa": "https://go.dev1/",
+				"ggg":    "https://go.dev2/",
+				"gggg":   "https://go.de3v/",
+				"gggd":   "https://go.dev4/",
+				"ggh":    "https://go.dev5/",
+				"gggj":   "https://go.dev6/",
+				"ggdgd":  "https://go.dev7/",
+				"gggh":   "https://go.dev8/",
+				"ggjgj":  "https://go.dev9/",
 			},
 			request: `/ggdgd`,
 			want: want{
@@ -139,9 +145,8 @@ func TestRouters_shortURLGet(t *testing.T) {
 		},
 		{
 			name: "Negative test without data routers #1",
-			rtr: &Routers{
-				map[string]string{},
-			},
+			data: map[string]string{},
+
 			request: `/gg`,
 			want: want{
 				expectedCode:     http.StatusBadRequest,
@@ -150,10 +155,8 @@ func TestRouters_shortURLGet(t *testing.T) {
 		},
 		{
 			name: "Negative test bad request #2",
-			rtr: &Routers{
-				map[string]string{
-					"gg": "https://go.dev/",
-				},
+			data: map[string]string{
+				"ggasffafc": "https://go.dev/",
 			},
 			request: `/ggg`,
 			want: want{
@@ -163,10 +166,8 @@ func TestRouters_shortURLGet(t *testing.T) {
 		},
 		{
 			name: "Negative test bad request #3",
-			rtr: &Routers{
-				map[string]string{
-					"gg": "https://go.dev/",
-				},
+			data: map[string]string{
+				"gggfgfsdf": "https://go.dev/",
 			},
 			request: `/`,
 			want: want{
@@ -177,9 +178,15 @@ func TestRouters_shortURLGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			repo := repository.NewStorage()
+			short := app.NewShortenerHandler(repo)
+			api := NewHandlerAPI(short)
+			for i, v := range tt.data {
+				repo.Save(i, v)
+			}
 			r := httptest.NewRequest(http.MethodGet, tt.request, nil)
 			w := httptest.NewRecorder()
-			tt.rtr.shortURLGet(w, r)
+			api.shortURLGet(w, r)
 			assert.Equal(t, tt.want.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
 			assert.Equal(t, tt.want.expectedLocation, w.Header().Get("Location"), "ответ header Location не совпадает с ожидаемым")
 		})
