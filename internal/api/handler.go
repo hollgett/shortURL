@@ -1,57 +1,81 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/hollgett/shortURL.git/internal/app"
+	"github.com/hollgett/shortURL.git/internal/config"
 )
 
 type HandlerAPI struct {
-	ShortenerService *app.ShortenerHandler
+	ShortenerService app.ShortenerHandler
+	cfg              *config.Config
 }
 
-func NewHandlerAPI(shortenerHandler *app.ShortenerHandler) *HandlerAPI {
-	return &HandlerAPI{ShortenerService: shortenerHandler}
+func NewHandlerAPI(shortenerHandler app.ShortenerHandler, cfg *config.Config) *HandlerAPI {
+	return &HandlerAPI{ShortenerService: shortenerHandler,
+		cfg: cfg}
 }
 
-func (h *HandlerAPI) shortURLPost(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerAPI) ShortURLPost(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("Content-Type")
 	//create short url
-	shortLink, err := h.ShortenerService.CreateShortURL(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	switch header {
+	case "text/plain; charset=utf-8", "text/plain":
+		//read request body
+		urlByte, err := io.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil || len(urlByte) == 0 {
+			http.Error(w, fmt.Sprint("request body error:", err.Error()), http.StatusBadRequest)
+			return
+		}
+		shLink, err := h.ShortenerService.CreateShortURL(string(urlByte))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintf(w, "%s%s%s%s", "http://", r.Host, r.URL, shLink)
+	case "application/json":
+		var request RequestJson
+		err := json.NewDecoder(r.Body).Decode(&request)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		shLink, err := h.ShortenerService.CreateShortURL(request.RequestURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		response := ResponseJson{
+			ResponseURL: fmt.Sprintf("%s/%s", h.cfg.BaseURL, shLink),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(&response)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	//return response
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, `http://localhost:8080/%s`, shortLink)
+
 }
 
 // processing post request
-func (h *HandlerAPI) shortURLGet(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerAPI) ShortURLGet(w http.ResponseWriter, r *http.Request) {
 	//search exist short url and return original URL
-	originalURL, err := h.ShortenerService.GetShortURL(r.URL.Path)
+	short := chi.URLParam(r, "short")
+	originalURL, err := h.ShortenerService.GetShortURL(short)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-
-}
-
-func (h *HandlerAPI) ShortURLmiddleware() http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//checking http method and redirect
-		switch r.Method {
-		case http.MethodPost:
-			h.shortURLPost(w, r)
-		case http.MethodGet:
-			h.shortURLGet(w, r)
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-	})
 }
