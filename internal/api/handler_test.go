@@ -1,194 +1,148 @@
 package api
 
 import (
-	"bytes"
-	"io"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-resty/resty/v2"
+	gomock "github.com/golang/mock/gomock"
 	"github.com/hollgett/shortURL.git/internal/app"
-	"github.com/hollgett/shortURL.git/internal/repository"
+	"github.com/hollgett/shortURL.git/internal/config"
+	"github.com/hollgett/shortURL.git/internal/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_shortURLmiddleware(t *testing.T) {
-	tests := []struct {
-		name         string
-		method       string
-		expectedCode int
-	}{
-		{name: "Test Method Delete", method: http.MethodDelete, expectedCode: http.StatusMethodNotAllowed},
-		{name: "Test Method Put", method: http.MethodPut, expectedCode: http.StatusMethodNotAllowed},
-		{name: "Test Method Post without data", method: http.MethodPost, expectedCode: http.StatusBadRequest},
-		{name: "Test Method Get without data", method: http.MethodGet, expectedCode: http.StatusBadRequest},
+func newRequest(t *testing.T, ts *httptest.Server, reqBody, method, path string) *resty.Response {
+	client := &http.Client{
+		Transport: ts.Client().Transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := repository.NewStorage()
-			short := app.NewShortenerHandler(repo)
-			api := NewHandlerAPI(short)
+	clientResty := resty.NewWithClient(client).
+		SetBaseURL(ts.URL).
+		SetHeader("Content-Type", "text/plain")
+	var resp *resty.Response
+	var err error
+	if method == http.MethodGet {
+		resp, err = clientResty.R().Get(path)
+	} else {
+		resp, err = clientResty.R().SetBody(reqBody).Post(path)
+	}
+	require.NoError(t, err)
 
-			r := httptest.NewRequest(tt.method, `/`, nil)
-			w := httptest.NewRecorder()
-			h := api.ShortURLmiddleware()
-			h(w, r)
-			assert.Equal(t, tt.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
-		})
+	return resp
+}
+
+func newServer(short app.ShortenerHandler) *httptest.Server {
+	rtr := chi.NewRouter()
+	ts := httptest.NewServer(rtr)
+	cfg := &config.Config{
+		Addr:    strings.Split(ts.URL, ":")[2],
+		BaseURL: ts.URL,
 	}
+	api := NewHandlerAPI(short, cfg)
+
+	rtr.Post("/", api.ShortURLPost)
+	rtr.Get("/{short}", api.ShortURLGet)
+
+	return ts
+}
+
+func simulateShortener(ctrl *gomock.Controller, url string, err error) app.ShortenerHandler {
+	controller := mock.NewMockShortenerHandler(ctrl)
+
+	controller.EXPECT().CreateShortURL(gomock.Any()).Return(url, err).AnyTimes()
+	controller.EXPECT().GetShortURL(gomock.Any()).Return(url, err).AnyTimes()
+
+	return controller
 }
 
 func TestRouters_shortURLPost(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
 	type want struct {
 		expectedCode int
 		contentType  string
 	}
 	tests := []struct {
-		name    string
-		want    want
-		request string
+		name          string
+		want          want
+		short         app.ShortenerHandler
+		request       string
+		expectedShort string
 	}{
 		{
-			name: "Positive test #1",
+			name: "Positive test",
 			want: want{
 				expectedCode: http.StatusCreated,
 				contentType:  "text/plain",
 			},
-			request: "https://mail.google.com/",
+			short:         simulateShortener(controller, "gg", nil),
+			request:       "https://mail.google.com/",
+			expectedShort: "/gg",
 		},
 		{
-			name: "Positive test #2",
-			want: want{
-				expectedCode: http.StatusCreated,
-				contentType:  "text/plain",
-			},
-			request: "/",
-		},
-		{
-			name: "Negative test without data #1",
+			name: "negative test without request",
 			want: want{
 				expectedCode: http.StatusBadRequest,
-				contentType:  "text/plain",
+				contentType:  "text/plain; charset=utf-8",
 			},
-			request: "",
+			short:         simulateShortener(controller, "", errors.New("request body error")),
+			request:       "/",
+			expectedShort: "request body error",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := repository.NewStorage()
-			short := app.NewShortenerHandler(repo)
-			api := NewHandlerAPI(short)
-
-			r := httptest.NewRequest(http.MethodPost, `/`, bytes.NewBuffer([]byte(tt.request)))
-			w := httptest.NewRecorder()
-			r.Header.Set("Content-Type", tt.want.contentType)
-
-			api.shortURLPost(w, r)
-			result := w.Result()
-			defer result.Body.Close()
-			assert.Equal(t, tt.want.expectedCode, result.StatusCode, "Код ответа не совпадает с ожидаемым")
-			if result.StatusCode != http.StatusBadRequest {
-				assert.Equal(t, tt.want.contentType, w.Header().Get("Content-Type"), "Передаваемый тип контента не совпадает с ожидаемым")
-
-				res, err := io.ReadAll(result.Body)
-				require.NoError(t, err, "Тело запроса имеет ошибку")
-				link := strings.Replace(string(res), "http://localhost:8080/", "", -1)
-				r, _ := repo.Find(link)
-				assert.Equal(t, r, tt.request, "Передаваемый ответ не совпадает с ожидаемым")
-			}
+			ts := newServer(tt.short)
+			defer ts.Close()
+			resp := newRequest(t, ts, tt.request, http.MethodPost, `/`)
+			assert.Equal(t, tt.want.expectedCode, resp.StatusCode(), "Код ответа не совпадает с ожидаемым")
+			assert.Equal(t, tt.want.contentType, resp.Header().Get("Content-Type"), "Передаваемый тип контента не совпадает с ожидаемым")
+			assert.Equal(t, tt.expectedShort, strings.Replace(strings.TrimSpace(resp.String()), ts.URL, "", -1))
 		})
 	}
 }
 
 func TestRouters_shortURLGet(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
 	type want struct {
 		expectedCode     int
 		expectedLocation string
 	}
 	tests := []struct {
 		name    string
-		data    map[string]string
+		short   app.ShortenerHandler
 		request string
 		want    want
 	}{
 		{
-			name: "Positive test #1",
-			data: map[string]string{
-				"gg": "https://go.dev/",
-			},
-			request: `/gg`,
+			name:    "Positive test #1",
+			short:   simulateShortener(controller, "https://go.dev/", nil),
+			request: "gg",
 			want: want{
 				expectedCode:     http.StatusTemporaryRedirect,
 				expectedLocation: "https://go.dev/",
 			},
 		},
-		{
-			name: "Positive test with a lot of routers #2",
-			data: map[string]string{
-				"gggdsa": "https://go.dev1/",
-				"ggg":    "https://go.dev2/",
-				"gggg":   "https://go.de3v/",
-				"gggd":   "https://go.dev4/",
-				"ggh":    "https://go.dev5/",
-				"gggj":   "https://go.dev6/",
-				"ggdgd":  "https://go.dev7/",
-				"gggh":   "https://go.dev8/",
-				"ggjgj":  "https://go.dev9/",
-			},
-			request: `/ggdgd`,
-			want: want{
-				expectedCode:     http.StatusTemporaryRedirect,
-				expectedLocation: "https://go.dev7/",
-			},
-		},
-		{
-			name: "Negative test without data routers #1",
-			data: map[string]string{},
-
-			request: `/gg`,
-			want: want{
-				expectedCode:     http.StatusBadRequest,
-				expectedLocation: "",
-			},
-		},
-		{
-			name: "Negative test bad request #2",
-			data: map[string]string{
-				"ggasffafc": "https://go.dev/",
-			},
-			request: `/ggg`,
-			want: want{
-				expectedCode:     http.StatusBadRequest,
-				expectedLocation: "",
-			},
-		},
-		{
-			name: "Negative test bad request #3",
-			data: map[string]string{
-				"gggfgfsdf": "https://go.dev/",
-			},
-			request: `/`,
-			want: want{
-				expectedCode:     http.StatusBadRequest,
-				expectedLocation: "",
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := repository.NewStorage()
-			short := app.NewShortenerHandler(repo)
-			api := NewHandlerAPI(short)
-			for i, v := range tt.data {
-				repo.Save(i, v)
-			}
-			r := httptest.NewRequest(http.MethodGet, tt.request, nil)
-			w := httptest.NewRecorder()
-			api.shortURLGet(w, r)
-			assert.Equal(t, tt.want.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
-			assert.Equal(t, tt.want.expectedLocation, w.Header().Get("Location"), "ответ header Location не совпадает с ожидаемым")
+			ts := newServer(tt.short)
+			defer ts.Close()
+			resp := newRequest(t, ts, "", http.MethodGet, "/"+tt.request)
+
+			assert.Equal(t, tt.want.expectedCode, resp.StatusCode(), "Код ответа не совпадает с ожидаемым")
+			assert.Equal(t, tt.want.expectedLocation, resp.Header().Get("Location"), "ответ header Location не совпадает с ожидаемым")
 		})
 	}
 }

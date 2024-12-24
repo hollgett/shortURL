@@ -1,20 +1,35 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"math/rand"
 	"net/url"
 
+	"github.com/hollgett/shortURL.git/internal/config"
 	"github.com/hollgett/shortURL.git/internal/repository"
 )
 
-type ShortenerHandler struct {
-	Repo repository.Storage
+type Data struct {
+	Url string `json:"url"`
 }
 
-func NewShortenerHandler(repo repository.Storage) *ShortenerHandler {
-	return &ShortenerHandler{Repo: repo}
+//go:generate mockgen -source=./shortener.go -destination=../mock/shortener.go -package=mock
+type ShortenerHandler interface {
+	RandomID() string
+	CreateShortURL(body string) (string, error)
+	CreateShortURLjson(body io.ReadCloser) (string, error)
+	GetShortURL(pathURL string) (string, error)
+}
+
+type Shortener struct {
+	Repo   repository.Storage
+	config *config.Config
+}
+
+func NewShortenerHandler(repo repository.Storage, config *config.Config) ShortenerHandler {
+	return &Shortener{Repo: repo, config: config}
 }
 
 func isValid(u string) bool {
@@ -22,7 +37,7 @@ func isValid(u string) bool {
 	return err == nil
 }
 
-func (sh *ShortenerHandler) randomID() string {
+func (sh *Shortener) RandomID() string {
 	//create random URL path
 	shortLink := make([]byte, 8)
 	for i := range shortLink {
@@ -36,37 +51,46 @@ func (sh *ShortenerHandler) randomID() string {
 	if _, err := sh.Repo.Find(string(shortLink)); err != nil {
 		return string(shortLink)
 	} else {
-		return sh.randomID()
+		return sh.RandomID()
 	}
 }
 
 // processing post request
-func (sh *ShortenerHandler) CreateShortURL(body io.ReadCloser) (string, error) {
-	//read request body
-	defer body.Close()
-	urlByte, err := io.ReadAll(body)
-	if err != nil || len(urlByte) == 0 {
-		return "", errors.Join(errors.New("request body error: "), err)
-	}
+func (sh *Shortener) CreateShortURL(body string) (string, error) {
 	//checking link
-	originalURL := string(urlByte)
+	originalURL := body
 	if !isValid(originalURL) {
 		return "", errors.New("request link doesn't match")
 	}
 	//create short route
-	shortLink := sh.randomID()
+	shortLink := sh.RandomID()
 	sh.Repo.Save(shortLink, originalURL)
 	//return response
 	return shortLink, nil
 }
 
-// processing post request
-func (sh *ShortenerHandler) GetShortURL(pathURL string) (string, error) {
-	//search exist short url and return original URL
-	shortLink := pathURL[1:]
-	if len(shortLink) == 0 {
-		return "", errors.New("URL path length zero")
+func (sh *Shortener) CreateShortURLjson(body io.ReadCloser) (string, error) {
+	var d Data
+	//read request body
+	err := json.NewDecoder(body).Decode(&d)
+	if err != nil {
+		return "", errors.Join(errors.New("request body error: "), err)
 	}
+	//checking link
+	originalURL := d.Url
+	if !isValid(originalURL) {
+		return "", errors.New("request link doesn't match")
+	}
+	//create short route
+	sh.Repo.Save("test", originalURL)
+	//return response
+	return "", nil
+}
+
+// processing post request
+func (sh *Shortener) GetShortURL(pathURL string) (string, error) {
+	//search exist short url and return original URL
+	shortLink := pathURL
 	originalURL, err := sh.Repo.Find(shortLink)
 	if err != nil {
 		return "", errors.Join(errors.New("find original link error: "), err)

@@ -1,71 +1,64 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"strings"
+	"net/url"
+
+	"github.com/go-resty/resty/v2"
 )
 
 func readerConsole() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	url, err := reader.ReadString('\n')
-	url = strings.TrimSpace(url)
-	if err != nil {
-		return "", err
-	}
+	// reader := bufio.NewReader(os.Stdin)
+	// url, err := reader.ReadString('\n')
+	// url = strings.TrimSpace(url)
+	// if err != nil {
+	// 	return "", err
+	// }
+	url := "https://www.youtube.com/"
 	return url, nil
 }
 
-func clientShortener(url string) error {
-	client := &http.Client{
+type Client struct {
+	httpClient *resty.Client
+}
+
+func NewClient() *Client {
+	client := resty.NewWithClient(&http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
-		},
-	}
+		}}).
+		SetBaseURL("http://localhost:8080").
+		SetHeader("Content-Type", "text/plain; charset=utf-8")
 
-	fmt.Printf("original url: %#v\n", url)
-	body := []byte(url)
-	request, err := http.NewRequest(http.MethodPost, `http://localhost:8080/`, bytes.NewBuffer(body))
+	return &Client{
+		httpClient: client,
+	}
+}
+
+func clientShortener(originalURL string) error {
+	fmt.Printf("original url: %#v\n", originalURL)
+	client := NewClient()
+	resp, err := client.httpClient.R().SetBody(originalURL).Post("/")
 	if err != nil {
 		return err
 	}
-	request.Header.Set("Content-Type", "text/plain")
-
-	response, err := client.Do(request)
+	resShort := resp.String()
+	fmt.Printf("status code post: %v \t short url: %#v\n", resp.StatusCode(), resShort)
+	shortUrl, err := url.Parse(resShort)
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
-
-	cnt, err := io.ReadAll(response.Body)
+	fmt.Println(shortUrl.Path)
+	resp, err = client.httpClient.R().Get(shortUrl.Path)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("status code: %v \t short url: %#v\n", response.StatusCode, string(cnt))
-
-	request, err = http.NewRequest(http.MethodGet, string(cnt), nil)
-	if err != nil {
-		return err
-	}
-	response, err = client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	fmt.Printf("status code: %v\t\n", response.StatusCode)
-	if _, err := io.Copy(io.Discard, response.Body); err != nil {
-		return err
-	}
-	locationGet := response.Header.Get("Location")
+	fmt.Printf("status code get: %v\t\n", resp.StatusCode())
+	locationGet := resp.Header().Get("Location")
 	fmt.Printf("Location get: %s\r\n", locationGet)
-	if url != locationGet {
+	if originalURL != locationGet {
 		return errors.New("original url and short response not equal")
 	}
 
