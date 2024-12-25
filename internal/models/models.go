@@ -1,4 +1,4 @@
-package api
+package models
 
 type RequestJson struct {
 	RequestURL string `json:"url"`
