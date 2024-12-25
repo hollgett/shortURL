@@ -1,27 +1,15 @@
 package app
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
+	"fmt"
 	"math/rand"
 	"net/url"
 
 	"github.com/hollgett/shortURL.git/internal/config"
+	"github.com/hollgett/shortURL.git/internal/logger"
 	"github.com/hollgett/shortURL.git/internal/repository"
+	"go.uber.org/zap"
 )
-
-type Data struct {
-	Url string `json:"url"`
-}
-
-//go:generate mockgen -source=./shortener.go -destination=../mock/shortener.go -package=mock
-type ShortenerHandler interface {
-	RandomID() string
-	CreateShortURL(body string) (string, error)
-	CreateShortURLjson(body io.ReadCloser) (string, error)
-	GetShortURL(pathURL string) (string, error)
-}
 
 type Shortener struct {
 	Repo   repository.Storage
@@ -32,9 +20,12 @@ func NewShortenerHandler(repo repository.Storage, config *config.Config) Shorten
 	return &Shortener{Repo: repo, config: config}
 }
 
-func isValid(u string) bool {
-	_, err := url.Parse(u)
-	return err == nil
+func isValidURL(URL string) error {
+	logger.Log.Info("validated URL start",
+		zap.String("url take", URL),
+	)
+	_, err := url.Parse(URL)
+	return err
 }
 
 func (sh *Shortener) RandomID() string {
@@ -56,35 +47,24 @@ func (sh *Shortener) RandomID() string {
 }
 
 // processing post request
-func (sh *Shortener) CreateShortURL(body string) (string, error) {
+func (sh *Shortener) CreateShortURL(requestData string) (string, error) {
 	//checking link
-	originalURL := body
-	if !isValid(originalURL) {
-		return "", errors.New("request link doesn't match")
+	originalURL := requestData
+	if err := isValidURL(originalURL); err != nil {
+		logger.Log.Info("validated URL complete with error",
+			zap.String("error", err.Error()),
+		)
+		return "", fmt.Errorf("request URL doesn't match, error: %w", err)
 	}
 	//create short route
 	shortLink := sh.RandomID()
 	sh.Repo.Save(shortLink, originalURL)
+	logger.Log.Info("data save storage",
+		zap.String("data key save", shortLink),
+		zap.String("data value save", originalURL),
+	)
 	//return response
 	return shortLink, nil
-}
-
-func (sh *Shortener) CreateShortURLjson(body io.ReadCloser) (string, error) {
-	var d Data
-	//read request body
-	err := json.NewDecoder(body).Decode(&d)
-	if err != nil {
-		return "", errors.Join(errors.New("request body error: "), err)
-	}
-	//checking link
-	originalURL := d.Url
-	if !isValid(originalURL) {
-		return "", errors.New("request link doesn't match")
-	}
-	//create short route
-	sh.Repo.Save("test", originalURL)
-	//return response
-	return "", nil
 }
 
 // processing post request
@@ -92,8 +72,17 @@ func (sh *Shortener) GetShortURL(pathURL string) (string, error) {
 	//search exist short url and return original URL
 	shortLink := pathURL
 	originalURL, err := sh.Repo.Find(shortLink)
+	logger.Log.Info("data find storage start",
+		zap.String("data key", shortLink),
+	)
 	if err != nil {
-		return "", errors.Join(errors.New("find original link error: "), err)
+		logger.Log.Info("data find storage complete with error",
+			zap.String("error", err.Error()),
+		)
+		return "", fmt.Errorf("find original link error: %w", err)
 	}
+	logger.Log.Info("data find storage complete",
+		zap.String("data value find", originalURL),
+	)
 	return originalURL, nil
 }
