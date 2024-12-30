@@ -94,7 +94,7 @@ func (h *HandlerAPI) handlePlainTextRequest(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *HandlerAPI) handleJSONRequest(w http.ResponseWriter, r *http.Request) {
-	var request models.RequestJson
+	var request models.RequestJSON
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		logger.Log.Info(
@@ -118,7 +118,7 @@ func (h *HandlerAPI) handleJSONRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := models.ResponseJson{
+	response := models.ResponseJSON{
 		ResponseURL: fmt.Sprintf("%s/%s", h.cfg.BaseURL, shLink),
 	}
 

@@ -1,9 +1,9 @@
 package models
 
-type RequestJson struct {
+type RequestJSON struct {
 	RequestURL string `json:"url"`
 }
 
-type ResponseJson struct {
+type ResponseJSON struct {
 	ResponseURL string `json:"result"`
 }
