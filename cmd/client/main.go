@@ -46,12 +46,12 @@ func clientShortener(originalURL string) error {
 	}
 	resShort := resp.String()
 	fmt.Printf("status code post: %v \t short url: %#v\n", resp.StatusCode(), resShort)
-	shortUrl, err := url.Parse(resShort)
+	shortURL, err := url.Parse(resShort)
 	if err != nil {
 		return err
 	}
-	fmt.Println(shortUrl.Path)
-	resp, err = client.httpClient.R().Get(shortUrl.Path)
+	fmt.Println(shortURL.Path)
+	resp, err = client.httpClient.R().Get(shortURL.Path)
 	if err != nil {
 		return err
 	}
