@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/hollgett/shortURL.git/internal/logger"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -29,37 +27,27 @@ func validatePort(addr string) error {
 	return nil
 }
 
-func InitConfig() *Config {
+var Cfg *Config = &Config{}
+
+func InitConfig() error {
 	cfg := &Config{}
 
 	addr := flag.String("a", ":8080", "host and port to run server :port")
 	resURL := flag.String("b", "http://localhost:8080", "static short url")
 	flag.Parse()
 	if err := env.Parse(cfg); err != nil {
-		logger.Log.Info("env parse panic",
-			zap.String("env parse error", err.Error()),
-		)
-		panic(err)
+		return err
 	}
-	if cfg.Addr == "" || cfg.BaseURL == "" {
-		if cfg.Addr == "" {
-			cfg.Addr = *addr
-		}
-		if cfg.BaseURL == "" {
-			cfg.BaseURL = *resURL
-		}
+
+	if cfg.Addr == "" {
+		cfg.Addr = *addr
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = *resURL
 	}
 	if err := validatePort(cfg.Addr); err != nil {
-		logger.Log.Info("config panic",
-			zap.String("config address", cfg.Addr),
-			zap.String("validate port panic", err.Error()),
-		)
-		panic(err)
+		return err
 	}
-	logger.Log.Info(
-		"server start with config",
-		zap.String("server address", cfg.Addr),
-		zap.String("server base URL", cfg.BaseURL),
-	)
-	return cfg
+	Cfg = cfg
+	return nil
 }

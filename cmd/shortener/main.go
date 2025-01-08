@@ -11,26 +11,25 @@ import (
 )
 
 func main() {
-	err := logger.InitLogger()
-	if err != nil {
+	if err := logger.InitLogger(); err != nil {
 		panic(err)
 	}
-	cfg := config.InitConfig()
-
+	if err := config.InitConfig(); err != nil {
+		logger.LogInfo("init config", zap.String("error", err.Error()))
+		return
+	}
+	logger.LogInfo("server start", zap.Any("arg", config.Cfg))
 	//data base
 	repo := repository.NewStorage()
 	//logic handler the short URl
-	shortener := app.NewShortenerHandler(repo, cfg)
+	shortener := app.NewShortenerHandler(repo)
 	//http logic
-	apih := api.NewHandlerAPI(shortener, cfg)
+	apih := api.NewHandlerAPI(shortener)
 
 	//start serve
-	srv := server.NewServer(apih, cfg)
+	srv := server.NewServer(apih)
 	if err := srv.ListenAndServe(); err != nil {
-		logger.Log.Info(
-			"listen and serve panic",
-			zap.String("error", err.Error()),
-		)
+		logger.LogInfo("serve start", zap.String("error", err.Error()))
 		panic(err)
 	}
 }

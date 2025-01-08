@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -61,7 +65,102 @@ func clientShortener(originalURL string) error {
 	if originalURL != locationGet {
 		return errors.New("original url and short response not equal")
 	}
+	return nil
+}
 
+func clientShortenerJSON(originalURL string) error {
+	fmt.Printf("original url: %#v\n", originalURL)
+	client := NewClient()
+	request, err := json.Marshal(RequestJSON{
+		RequestURL: originalURL,
+	})
+	if err != nil {
+		return err
+	}
+	var bw bytes.Buffer
+	gw := gzip.NewWriter(&bw)
+	_, err = gw.Write(request)
+	if err != nil {
+		return fmt.Errorf("gzip writer: %w", err)
+	}
+	gw.Close()
+	resp, err := client.httpClient.R().SetBody(bw.Bytes()).
+		SetHeader("Content-Type", "application/x-gzip").
+		SetHeader("Accept-Encoding", "gzip").
+		SetHeader("Content-Encoding", "gzip").
+		Post("/api/shorten")
+	if err != nil {
+		return fmt.Errorf("request post: %w", err)
+	}
+	fmt.Println(resp.Header().Get("Content-Encoding"))
+	fmt.Println(resp.String())
+	gr, err := gzip.NewReader(resp.RawBody())
+	if err != nil {
+		return fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gr.Close()
+	var br bytes.Buffer
+	_, err = io.Copy(&br, gr)
+	if err != nil {
+		return fmt.Errorf("copy: %w", err)
+	}
+	response := ResponseJSON{}
+	json.Unmarshal(br.Bytes(), &response)
+	fmt.Printf("status code post: %v \t short url: %#v\n", resp.StatusCode(), response)
+	shortURL, err := url.Parse(response.ResponseURL)
+	if err != nil {
+		return fmt.Errorf("parse url: %w", err)
+	}
+	fmt.Println(shortURL.Path)
+	resp, err = client.httpClient.R().Get(shortURL.Path)
+	if err != nil {
+		return fmt.Errorf("request get: %w", err)
+	}
+	fmt.Printf("status code get: %v\t\n", resp.StatusCode())
+	locationGet := resp.Header().Get("Location")
+	fmt.Printf("Location get: %s\r\n", locationGet)
+	if originalURL != locationGet {
+		return errors.New("original url and short response not equal")
+	}
+	return nil
+}
+
+func clientShortenerGzip(originalURL string) error {
+	fmt.Printf("original url: %#v\n", originalURL)
+	client := NewClient()
+	var bw bytes.Buffer
+	gw := gzip.NewWriter(&bw)
+	_, err := gw.Write([]byte(originalURL))
+	if err != nil {
+		return fmt.Errorf("gzip writer: %w", err)
+	}
+	fmt.Println("bytes",string(bw.String()))
+	gw.Close()
+	resp, err := client.httpClient.R().SetBody(bw.Bytes()).
+		SetHeader("Content-Type", "application/x-gzip").
+		SetHeader("Accept-Encoding", "gzip").
+		SetHeader("Content-Encoding", "gzip").
+		Post("/")
+	if err != nil {
+		return err
+	}
+	resShort := resp.String()
+	fmt.Printf("status code post: %v \t short url: %#v\n", resp.StatusCode(), resShort)
+	shortURL, err := url.Parse(resShort)
+	if err != nil {
+		return err
+	}
+	fmt.Println(shortURL.Path)
+	resp, err = client.httpClient.R().Get(shortURL.Path)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("status code get: %v\t\n", resp.StatusCode())
+	locationGet := resp.Header().Get("Location")
+	fmt.Printf("Location get: %s\r\n", locationGet)
+	if originalURL != locationGet {
+		return errors.New("original url and short response not equal")
+	}
 	return nil
 }
 
@@ -72,7 +171,7 @@ func main() {
 		return
 	}
 
-	if err := clientShortener(url); err != nil {
+	if err := clientShortenerGzip(url); err != nil {
 		fmt.Println(err)
 		return
 	}

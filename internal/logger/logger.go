@@ -43,43 +43,35 @@ func InitLogger() error {
 	return nil
 }
 
+func LogInfo(msg string, field ...zap.Field) {
+	Log.Info(msg, field...)
+}
+
 func RequestMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		Log.Info(
-			"Request start",
-			zap.String("uri", r.RequestURI),
-			zap.String("method", r.Method),
-		)
+		LogInfo("Request start", zap.String("uri", r.RequestURI), zap.String("method", r.Method))
 
 		next.ServeHTTP(w, r)
 		duration := time.Since(start)
-		Log.Info(
-			"Request complete",
-			zap.String("uri", r.RequestURI),
-			zap.String("method", r.Method),
-			zap.Duration("duration", duration),
-		)
+		LogInfo("Request complete", zap.String("uri", r.RequestURI), zap.String("method", r.Method), zap.Duration("duration", duration))
+
 	})
 }
 
 func ResponseMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 
-		respData := responseData{}
+		respData := &responseData{}
 
 		logResp := loggingResponseWrite{
 			ResponseWriter: w,
-			responseData:   &respData,
+			responseData:   respData,
 		}
 
 		next.ServeHTTP(&logResp, r)
 
-		Log.Info(
-			"Response complete",
-			zap.Int("status", respData.status),
-			zap.Int("size", respData.size),
-		)
+		LogInfo("Response complete", zap.Int("status", respData.status), zap.Int("size", respData.size))
 	}
 
 	return http.HandlerFunc(fn)
