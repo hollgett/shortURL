@@ -14,9 +14,10 @@ func setupRouters(handler *api.HandlerAPI) *chi.Mux {
 
 	r.Use(logger.RequestMiddleware)
 	r.Use(logger.ResponseMiddleware)
-	r.Post("/", handler.ShortURLPost)
+	r.Use(api.CompressMiddleware)
+	r.Post("/", handler.HandlePlainTextRequest)
 	r.Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.ShortURLPost)
+		r.Post("/shorten", handler.HandleJSONRequest)
 	})
 	r.Get("/{short}", handler.ShortURLGet)
 
@@ -24,10 +25,10 @@ func setupRouters(handler *api.HandlerAPI) *chi.Mux {
 }
 
 // start serve
-func NewServer(handler *api.HandlerAPI, config *config.Config) *http.Server {
+func NewServer(handler *api.HandlerAPI) *http.Server {
 	rtr := setupRouters(handler)
 	return &http.Server{
-		Addr:    config.Addr,
+		Addr:    config.Cfg.Addr,
 		Handler: rtr,
 	}
 }
