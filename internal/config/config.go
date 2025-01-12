@@ -21,7 +21,7 @@ func InitConfig() error {
 	cfg := &Config{}
 	addr := flag.String("a", ":8080", "host and port to run server :port")
 	resURL := flag.String("b", "http://localhost:8080", "static short url")
-	fStorage := flag.String("f", "/tmp/short-url-db.json", "storage data")
+	fStorage := flag.String("f", "", "storage data")
 	flag.Parse()
 	if err := env.Parse(cfg); err != nil {
 		return err
@@ -39,9 +39,7 @@ func InitConfig() error {
 	case *fStorage != "":
 		cfg.FileStorage = *fStorage
 	}
-	if cfg.FileStorage != " " {
-		// validatePath(cfg)
-	} else {
+	if cfg.FileStorage == "" {
 		cfg.FileStorage = "without"
 	}
 	if err := validatePort(cfg.Addr); err != nil {
@@ -63,9 +61,4 @@ func validatePort(addr string) error {
 	}
 
 	return nil
-}
-
-func validatePath(cfg *Config) {
-	fParam := strings.Split(cfg.FileStorage, `/`)
-	cfg.FileStorage = fParam[len(fParam)-1]
 }
