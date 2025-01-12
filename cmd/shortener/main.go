@@ -20,7 +20,11 @@ func main() {
 	}
 	logger.LogInfo("server start", zap.Any("arg", config.Cfg))
 	//data base
-	repo := repository.NewStorage()
+	repo, err := repository.NewStorage()
+	if err != nil {
+		logger.LogInfo("storage start", zap.Error(err))
+		return
+	}
 	//logic handler the short URl
 	shortener := app.NewShortenerHandler(repo)
 	//http logic

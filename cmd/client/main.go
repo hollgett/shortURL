@@ -134,7 +134,7 @@ func clientShortenerGzip(originalURL string) error {
 	if err != nil {
 		return fmt.Errorf("gzip writer: %w", err)
 	}
-	fmt.Println("bytes",string(bw.String()))
+	fmt.Println("bytes", bw.String())
 	gw.Close()
 	resp, err := client.httpClient.R().SetBody(bw.Bytes()).
 		SetHeader("Content-Type", "application/x-gzip").
