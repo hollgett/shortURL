@@ -36,14 +36,10 @@ func InitConfig() error {
 	}
 	switch {
 	case cfg.FileStorage != "":
-		if err := validatePath(cfg); err != nil {
-			return fmt.Errorf("validate path: %w", err)
-		}
+		validatePath(cfg)
 	case *fStorage != "":
 		cfg.FileStorage = *fStorage
-		if err := validatePath(cfg); err != nil {
-			return fmt.Errorf("validate path: %w", err)
-		}
+		validatePath(cfg)
 	default:
 		cfg.FileStorage = "without"
 	}
@@ -68,12 +64,11 @@ func validatePort(addr string) error {
 	return nil
 }
 
-func validatePath(cfg *Config) error {
+func validatePath(cfg *Config) {
 	pathTemp := cfg.FileStorage
 	path := filepath.FromSlash(pathTemp)
-	if filepath.Ext(path) == "" {
-		path = fmt.Sprintf("%s.json", path)
-	}
+	// if filepath.Ext(path) == "" {
+	// 	path = fmt.Sprintf("%s.json", path)
+	// }
 	cfg.FileStorage = path
-	return nil
 }
