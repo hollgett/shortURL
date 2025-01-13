@@ -43,33 +43,28 @@ func (sh *Shortener) RandomID() string {
 
 // processing post request
 func (sh *Shortener) CreateShortURL(requestData string) (string, error) {
+	logger.LogInfo("CreateShortURL start", zap.String("value", requestData))
 	//checking link
-	originalURL := requestData
-	if err := isValidURL(originalURL); err != nil {
-		logger.LogInfo("validated URL", zap.String("error", err.Error()))
+	if err := isValidURL(requestData); err != nil {
 		return "", fmt.Errorf("request URL doesn't match, error: %w", err)
 	}
 	//create short route
 	shortLink := sh.RandomID()
-	sh.Repo.Save(shortLink, originalURL)
-	logger.LogInfo("data save storage", zap.String("key", shortLink), zap.String("value", originalURL))
-
+	sh.Repo.Save(shortLink, requestData)
 	//return response
+	logger.LogInfo("CreateShortURL complete", zap.String("result", shortLink))
 	return shortLink, nil
 }
 
 // processing post request
 func (sh *Shortener) GetShortURL(pathURL string) (string, error) {
+	logger.LogInfo("GetShortURL start", zap.String("value", pathURL))
 	//search exist short url and return original URL
-	shortLink := pathURL
-
-	originalURL, err := sh.Repo.Find(shortLink)
-	logger.LogInfo("data find start", zap.String("key", shortLink))
+	originalURL, err := sh.Repo.Find(pathURL)
 	if err != nil {
 		logger.LogInfo("data find", zap.String("error", err.Error()))
 		return "", fmt.Errorf("find original link error: %w", err)
 	}
-
-	logger.LogInfo("data find complete", zap.String("value", originalURL))
+	logger.LogInfo("GetShortURL complete", zap.String("result", originalURL))
 	return originalURL, nil
 }

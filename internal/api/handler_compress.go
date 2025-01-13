@@ -16,11 +16,15 @@ type compressWriter struct {
 }
 
 func (cw *compressWriter) Write(p []byte) (int, error) {
-	logger.LogInfo("compress data", zap.Int("size", len(p)))
 	return cw.zw.Write(p)
 }
 func (cw *compressWriter) Close() error {
-	return cw.zw.Close()
+	err := cw.zw.Close()
+	if err != nil {
+		logger.LogInfo("close reader compress", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 type compressReader struct {
@@ -29,15 +33,21 @@ type compressReader struct {
 }
 
 func (cr *compressReader) Read(p []byte) (n int, err error) {
-	logger.LogInfo("decompress data", zap.Int("size", len(p)))
 	return cr.zw.Read(p)
 }
 
 func (cr *compressReader) Close() error {
-	if err := cr.r.Close(); err != nil {
+	err := cr.r.Close()
+	if err != nil {
+		logger.LogInfo("close read body", zap.Error(err))
 		return err
 	}
-	return cr.zw.Close()
+	err = cr.zw.Close()
+	if err != nil {
+		logger.LogInfo("close reader compress", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func CompressMiddleware(next http.Handler) http.Handler {

@@ -13,7 +13,7 @@ type DataStorage struct {
 	fileStorage bool
 }
 
-func NewStorage() (*DataStorage, error) {
+func NewStorage() (Storage, error) {
 	ds := DataStorage{
 		data: make(map[string]string),
 	}
@@ -42,14 +42,14 @@ func (ds *DataStorage) Save(shortLink, originURL string) {
 	if ds.fileStorage {
 		fStorage, err := newFileStorage(false)
 		if err != nil {
-			logger.LogInfo("open file", zap.Error(err))
+			logger.LogInfo("open file error", zap.Error(err))
 		}
 		fStorage.dataFill(shortLink, originURL)
 		if err := fStorage.writeFileStorage(); err != nil {
-			logger.LogInfo("write file", zap.Error(err))
+			logger.LogInfo("write file error", zap.Error(err))
 		}
 		if err := fStorage.close(); err != nil {
-			logger.LogInfo("close file", zap.Error(err))
+			logger.LogInfo("close file error", zap.Error(err))
 		}
 	}
 	ds.data[shortLink] = originURL
