@@ -9,48 +9,65 @@ import (
 	"github.com/hollgett/shortURL.git/internal/config"
 )
 
-type fileStorage struct {
+type fileStorageData struct {
 	Short    string `json:"short_url"`
 	Original string `json:"original_url"`
 }
 
-func readFileStorage(storage *map[string]string) error {
-	file, err := os.OpenFile(config.Cfg.FileStorage, os.O_RDONLY|os.O_CREATE, 0666)
-	defer file.Close()
-	if err != nil {
-		return fmt.Errorf("open file read: %w", err)
-	}
-	reader := bufio.NewScanner(file)
+type fileStorage struct {
+	file *os.File
+	data fileStorageData
+}
 
-	for reader.Scan() {
-		var fStorage fileStorage
-		if err := json.Unmarshal(reader.Bytes(), &fStorage); err != nil {
+func newFileStorage(readF bool) (*fileStorage, error) {
+	var flag int
+	switch readF {
+	case true:
+		flag = os.O_RDONLY | os.O_CREATE
+	case false:
+		flag = os.O_WRONLY | os.O_APPEND
+	}
+	file, err := os.OpenFile(config.Cfg.FileStorage, flag, 0666)
+	if err != nil {
+		return nil, err
+	}
+	return &fileStorage{
+		file: file,
+	}, nil
+}
+
+func (fs *fileStorage) close() error {
+	return fs.file.Close()
+}
+
+func (fs *fileStorage) readFileStorage(storage *DataStorage) error {
+	storage.fileStorage = true
+	scan := bufio.NewScanner(fs.file)
+	for scan.Scan() {
+		if err := json.Unmarshal(scan.Bytes(), &fs.data); err != nil {
 			return fmt.Errorf("decode data: %w", err)
 		}
-		(*storage)[fStorage.Short] = fStorage.Original
+		storage.data[fs.data.Short] = fs.data.Original
 	}
-	if err := reader.Err(); err != nil {
+	if err := scan.Err(); err != nil {
 		return fmt.Errorf("scanner data: %w", err)
 	}
 	return nil
 }
 
-func writeFileStorage(shortLink, originURL string) error {
-	file, err := os.OpenFile(config.Cfg.FileStorage, os.O_WRONLY|os.O_APPEND, 0666)
-	defer file.Close()
-	if err != nil {
-		return fmt.Errorf("open file write: %w", err)
-	}
-	data, err := json.Marshal(fileStorage{
-		Short:    shortLink,
-		Original: originURL,
-	})
+func (fs *fileStorage) writeFileStorage() error {
+	data, err := json.Marshal(fs.data)
 	if err != nil {
 		return fmt.Errorf("json encode: %w", err)
 	}
 	data = append(data, '\n')
-	if _, err := file.Write(data); err != nil {
+	if _, err := fs.file.Write(data); err != nil {
 		return fmt.Errorf("write error: %w", err)
 	}
 	return nil
+}
+
+func (fs *fileStorage) dataFill(shLink, origURL string) {
+	fs.data.Short = shLink
+	fs.data.Original = origURL
 }

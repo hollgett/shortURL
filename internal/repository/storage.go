@@ -2,7 +2,6 @@ package repository
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/hollgett/shortURL.git/internal/config"
 	"github.com/hollgett/shortURL.git/internal/logger"
@@ -15,32 +14,42 @@ type DataStorage struct {
 }
 
 func NewStorage() (*DataStorage, error) {
-	base := make(map[string]string)
+	ds := DataStorage{
+		data: make(map[string]string),
+	}
 	switch {
-	case config.Cfg.FileStorage == "without":
-
-		return &DataStorage{
-			data:        base,
-			fileStorage: false,
-		}, nil
+	case config.Cfg.FileStorage == "":
+		ds.data = make(map[string]string)
+		return &ds, nil
 	default:
-		if err := readFileStorage(&base); err != nil {
+		fStorage, err := newFileStorage(true)
+		if err != nil {
 			return nil, err
 		}
-		logger.LogInfo("file storage data", zap.Int("count", len(base)))
-		return &DataStorage{
-			data:        base,
-			fileStorage: true,
-		}, nil
+		if err := fStorage.readFileStorage(&ds); err != nil {
+			return nil, err
+		}
+		if err := fStorage.close(); err != nil {
+			return nil, err
+		}
+		logger.LogInfo("file storage data", zap.Int("count", len(ds.data)))
+		return &ds, nil
 	}
 
 }
 
 func (ds *DataStorage) Save(shortLink, originURL string) {
 	if ds.fileStorage {
-		fmt.Println("--------")
-		if err := writeFileStorage(shortLink, originURL); err != nil {
-			logger.LogInfo("wrtie file", zap.Error(err))
+		fStorage, err := newFileStorage(false)
+		if err != nil {
+			logger.LogInfo("open file", zap.Error(err))
+		}
+		fStorage.dataFill(shortLink, originURL)
+		if err := fStorage.writeFileStorage(); err != nil {
+			logger.LogInfo("write file", zap.Error(err))
+		}
+		if err := fStorage.close(); err != nil {
+			logger.LogInfo("close file", zap.Error(err))
 		}
 	}
 	ds.data[shortLink] = originURL

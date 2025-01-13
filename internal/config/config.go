@@ -41,12 +41,11 @@ func InitConfig() error {
 		cfg.FileStorage = *fStorage
 		validatePath(cfg)
 	default:
-		cfg.FileStorage = "without"
+		cfg.FileStorage = ""
 	}
 	if err := validatePort(cfg.Addr); err != nil {
 		return err
 	}
-	fmt.Println("----------", cfg.FileStorage)
 	Cfg = cfg
 	return nil
 }
@@ -54,7 +53,7 @@ func InitConfig() error {
 func validatePort(addr string) error {
 	listHP := strings.Split(addr, ":")
 	if len(listHP) != 2 || listHP[1] == "" {
-		return fmt.Errorf("address must be in the format :port, got: %s", addr)
+		return fmt.Errorf("address must be in the format host:port, got: %s", addr)
 	}
 
 	if _, err := strconv.Atoi(listHP[1]); err != nil {
@@ -67,8 +66,5 @@ func validatePort(addr string) error {
 func validatePath(cfg *Config) {
 	pathTemp := cfg.FileStorage
 	path := filepath.FromSlash(pathTemp)
-	// if filepath.Ext(path) == "" {
-	// 	path = fmt.Sprintf("%s.json", path)
-	// }
 	cfg.FileStorage = path
 }
