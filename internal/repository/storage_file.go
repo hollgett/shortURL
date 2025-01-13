@@ -4,13 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"path"
 
 	"github.com/hollgett/shortURL.git/internal/config"
-	"github.com/hollgett/shortURL.git/internal/logger"
-	"go.uber.org/zap"
 )
 
 type fileStorage struct {
@@ -19,51 +15,32 @@ type fileStorage struct {
 }
 
 func readFileStorage(storage *map[string]string) error {
-	path, err := pathToTemp()
+	file, err := os.OpenFile(config.Cfg.FileStorage, os.O_RDONLY|os.O_CREATE, 0666)
+	defer file.Close()
 	if err != nil {
-		return fmt.Errorf("path file: %w", err)
+		return fmt.Errorf("open file read: %w", err)
 	}
-	file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0555)
-	defer func() {
-		if err := file.Close(); err != nil {
-			logger.LogInfo("close file read", zap.Error(err))
-		}
-	}()
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	reader := bufio.NewReader(file)
-	var fStorage fileStorage
-	for {
-		data, err := reader.ReadBytes('\n')
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("read file: %w", err)
-		}
-		if len(data) == 0 && err == io.EOF {
-			return nil
-		}
-		if err := json.Unmarshal(data, &fStorage); err != nil {
+	reader := bufio.NewScanner(file)
+
+	for reader.Scan() {
+		var fStorage fileStorage
+		if err := json.Unmarshal(reader.Bytes(), &fStorage); err != nil {
 			return fmt.Errorf("decode data: %w", err)
 		}
 		(*storage)[fStorage.Short] = fStorage.Original
 	}
+	if err := reader.Err(); err != nil {
+		return fmt.Errorf("scanner data: %w", err)
+	}
+	return nil
 }
 
 func writeFileStorage(shortLink, originURL string) error {
-	path, err := pathToTemp()
+	file, err := os.OpenFile(config.Cfg.FileStorage, os.O_WRONLY|os.O_APPEND, 0666)
+	defer file.Close()
 	if err != nil {
-		return fmt.Errorf("path file: %w", err)
+		return fmt.Errorf("open file write: %w", err)
 	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0333)
-	defer func() {
-		if err := file.Close(); err != nil {
-			logger.LogInfo("close file write", zap.Error(err))
-		}
-	}()
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-
 	data, err := json.Marshal(fileStorage{
 		Short:    shortLink,
 		Original: originURL,
@@ -71,24 +48,9 @@ func writeFileStorage(shortLink, originURL string) error {
 	if err != nil {
 		return fmt.Errorf("json encode: %w", err)
 	}
-
-	writer := bufio.NewWriter(file)
-	if _, err := writer.Write(data); err != nil {
-		return fmt.Errorf("write data: %w", err)
+	data = append(data, '\n')
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("write error: %w", err)
 	}
-	if err := writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("write byte: %w", err)
-	}
-
-	return writer.Flush()
-}
-
-func pathToTemp() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("get path: %w", err)
-	}
-	path := path.Join(dir, config.Cfg.FileStorage)
-	logger.LogInfo("temp", zap.String("path", path))
-	return path, nil
+	return nil
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -35,17 +36,21 @@ func InitConfig() error {
 	}
 	switch {
 	case cfg.FileStorage != "":
-
+		if err := validatePath(cfg); err != nil {
+			return fmt.Errorf("validate path: %w", err)
+		}
 	case *fStorage != "":
 		cfg.FileStorage = *fStorage
-	}
-	if cfg.FileStorage == "" {
+		if err := validatePath(cfg); err != nil {
+			return fmt.Errorf("validate path: %w", err)
+		}
+	default:
 		cfg.FileStorage = "without"
 	}
 	if err := validatePort(cfg.Addr); err != nil {
 		return err
 	}
-
+	fmt.Println("----------", cfg.FileStorage)
 	Cfg = cfg
 	return nil
 }
@@ -60,5 +65,15 @@ func validatePort(addr string) error {
 		return fmt.Errorf("invalid port number: %s", listHP[1])
 	}
 
+	return nil
+}
+
+func validatePath(cfg *Config) error {
+	pathTemp := cfg.FileStorage
+	path := filepath.FromSlash(pathTemp)
+	if filepath.Ext(path) == "" {
+		path = fmt.Sprintf("%s.json", path)
+	}
+	cfg.FileStorage = path
 	return nil
 }

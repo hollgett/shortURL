@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/hollgett/shortURL.git/internal/config"
 	"github.com/hollgett/shortURL.git/internal/logger"
@@ -37,7 +38,10 @@ func NewStorage() (*DataStorage, error) {
 
 func (ds *DataStorage) Save(shortLink, originURL string) {
 	if ds.fileStorage {
-		writeFileStorage(shortLink, originURL)
+		fmt.Println("--------")
+		if err := writeFileStorage(shortLink, originURL); err != nil {
+			logger.LogInfo("wrtie file", zap.Error(err))
+		}
 	}
 	ds.data[shortLink] = originURL
 }
