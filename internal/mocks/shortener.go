@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -61,6 +62,20 @@ func (m *MockShortenerHandler) GetShortURL(pathURL string) (string, error) {
 func (mr *MockShortenerHandlerMockRecorder) GetShortURL(pathURL interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShortURL", reflect.TypeOf((*MockShortenerHandler)(nil).GetShortURL), pathURL)
+}
+
+// Ping mocks base method.
+func (m *MockShortenerHandler) Ping(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ping", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Ping indicates an expected call of Ping.
+func (mr *MockShortenerHandlerMockRecorder) Ping(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockShortenerHandler)(nil).Ping), ctx)
 }
 
 // RandomID mocks base method.

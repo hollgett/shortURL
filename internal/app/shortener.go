@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -50,7 +51,10 @@ func (sh *Shortener) CreateShortURL(requestData string) (string, error) {
 	}
 	//create short route
 	shortLink := sh.RandomID()
-	sh.Repo.Save(shortLink, requestData)
+	if err := sh.Repo.Save(shortLink, requestData); err != nil {
+		return "", fmt.Errorf("save data, error: %w", err)
+	}
+
 	//return response
 	logger.LogInfo("CreateShortURL complete", zap.String("result", shortLink))
 	return shortLink, nil
@@ -67,4 +71,8 @@ func (sh *Shortener) GetShortURL(pathURL string) (string, error) {
 	}
 	logger.LogInfo("GetShortURL complete", zap.String("result", originalURL))
 	return originalURL, nil
+}
+
+func (sh *Shortener) Ping(ctx context.Context) error {
+	return sh.Repo.Ping(ctx)
 }

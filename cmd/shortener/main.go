@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+
 	"github.com/hollgett/shortURL.git/internal/api"
 	"github.com/hollgett/shortURL.git/internal/app"
 	"github.com/hollgett/shortURL.git/internal/config"
@@ -11,22 +15,26 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go handlerShutDown(cancel)
+
 	//initialisation logger function
 	if err := logger.InitLogger(); err != nil {
-		panic(err)
+		logger.LogInfo("init logger error", zap.Error(err))
 	}
 	//initialisation config, read env and flag
 	if err := config.InitConfig(); err != nil {
 		logger.LogInfo("init config error", zap.Error(err))
-		return
 	}
-	logger.LogInfo("server start", zap.Any("arg", config.Cfg))
-	//data base create
-	repo, err := repository.NewStorage()
-	if err != nil {
-		logger.LogInfo("storage start error", zap.Error(err))
-		return
-	}
+	logger.LogInfo("server config", zap.Any("arg", config.Config))
+
+	repo := initStorage()
+	defer func() {
+		if err := repo.Close(); err != nil {
+			logger.LogInfo("repo close", zap.Error(err))
+		}
+	}()
 	//logic handler the shortener
 	shortener := app.NewShortenerHandler(repo)
 	//api logic
@@ -34,8 +42,56 @@ func main() {
 
 	//start serve with config
 	srv := server.NewServer(apih)
-	if err := srv.ListenAndServe(); err != nil {
-		logger.LogInfo("serve start", zap.String("error", err.Error()))
-		panic(err)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			logger.LogInfo("server", zap.Error(err))
+			cancel()
+		}
+	}()
+	defer func() {
+		if err := srv.Close(); err != nil {
+			logger.LogInfo("server close", zap.Error(err))
+		}
+	}()
+	<-ctx.Done()
+}
+
+func handlerShutDown(cancel context.CancelFunc) {
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	sig := <-signalCh
+	cancel()
+	logger.LogInfo("close app", zap.Any("signal", sig))
+}
+
+func initStorage() repository.Storage {
+	//repository create
+	var repo repository.Storage
+	switch {
+	case config.Config.DataBase != "":
+		db, err := repository.NewDataBase(config.Config.DataBase)
+		if err != nil {
+			logger.LogInfo("storage start error", zap.Error(err))
+			// panic(err)
+		}
+		logger.LogInfo("postgres DB")
+		repo = db
+	case config.Config.FileStorage != "":
+		fs, err := repository.NewFileStorage(config.Config.FileStorage)
+		if err != nil {
+			logger.LogInfo("init config error", zap.Error(err))
+			// panic(err)
+		}
+		logger.LogInfo("file DB")
+		repo = fs
+	default:
+		mem, err := repository.NewStorage()
+		if err != nil {
+			logger.LogInfo("storage start error", zap.Error(err))
+			// panic(err)
+		}
+		logger.LogInfo("memory DB")
+		repo = mem
 	}
+	return repo
 }

@@ -16,6 +16,7 @@ func setupRouters(handler *api.HandlerAPI) *chi.Mux {
 	r.Use(logger.ResponseMiddleware)
 	r.Use(api.CompressMiddleware)
 	r.Post("/", handler.HandlePlainTextRequest)
+	r.Get("/ping", handler.Ping)
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/shorten", handler.HandleJSONRequest)
 	})
@@ -28,7 +29,7 @@ func setupRouters(handler *api.HandlerAPI) *chi.Mux {
 func NewServer(handler *api.HandlerAPI) *http.Server {
 	rtr := setupRouters(handler)
 	return &http.Server{
-		Addr:    config.Cfg.Addr,
+		Addr:    config.Config.Addr,
 		Handler: rtr,
 	}
 }
