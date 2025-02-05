@@ -33,6 +33,6 @@ func ResponseWithSuccess(w http.ResponseWriter, headerK, headerV, shLink string,
 			response := fmt.Sprintf("%s/%s", config.Cfg.BaseURL, shLink)
 			fmt.Fprint(w, response)
 		}
-		logger.LogInfo("response", zap.String("data", shLink))
+		logger.LogInfo("response server", zap.String("data", shLink))
 	}
 }

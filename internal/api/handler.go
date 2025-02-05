@@ -8,9 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/hollgett/shortURL.git/internal/app"
 	"github.com/hollgett/shortURL.git/internal/jsonutil"
-	"github.com/hollgett/shortURL.git/internal/logger"
 	"github.com/hollgett/shortURL.git/internal/models"
-	"go.uber.org/zap"
 )
 
 type HandlerAPI struct {
@@ -32,7 +30,6 @@ func (h *HandlerAPI) HandlePlainTextRequest(w http.ResponseWriter, r *http.Reque
 		ResponseWithError(w, "handlePlainTextRequest read body", "request body empty", http.StatusBadRequest)
 		return
 	}
-	logger.LogInfo("body", zap.String("value", string(urlByte)))
 	shLink, err := h.ShortenerService.CreateShortURL(strings.TrimSpace(string(urlByte)))
 	if err != nil {
 		ResponseWithError(w, "CreateShortURL", err.Error(), http.StatusBadRequest)
@@ -47,7 +44,6 @@ func (h *HandlerAPI) HandleJSONRequest(w http.ResponseWriter, r *http.Request) {
 		ResponseWithError(w, "handleJSONRequest json decode", err.Error(), http.StatusBadRequest)
 		return
 	}
-	logger.LogInfo("handleJSONRequest json decode", zap.Any("argument", request))
 	shLink, err := h.ShortenerService.CreateShortURL(strings.TrimSpace(request.RequestURL))
 	if err != nil {
 		ResponseWithError(w, "CreateShortURL", err.Error(), http.StatusBadRequest)
@@ -60,7 +56,6 @@ func (h *HandlerAPI) HandleJSONRequest(w http.ResponseWriter, r *http.Request) {
 func (h *HandlerAPI) ShortURLGet(w http.ResponseWriter, r *http.Request) {
 	//search exist short url and return original URL
 	short := chi.URLParam(r, "short")
-	logger.LogInfo("ShortURLGet take", zap.String("URL", short))
 
 	originalURL, err := h.ShortenerService.GetShortURL(short)
 	if err != nil {
@@ -68,5 +63,4 @@ func (h *HandlerAPI) ShortURLGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ResponseWithSuccess(w, "Location", originalURL, "", http.StatusTemporaryRedirect)
-	logger.LogInfo("ShortURLGet complete", zap.String("location", originalURL))
 }
