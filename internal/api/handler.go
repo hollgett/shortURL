@@ -64,3 +64,11 @@ func (h *HandlerAPI) ShortURLGet(w http.ResponseWriter, r *http.Request) {
 	}
 	ResponseWithSuccess(w, "Location", originalURL, "", http.StatusTemporaryRedirect)
 }
+
+func (h *HandlerAPI) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := h.ShortenerService.Ping(r.Context()); err != nil {
+		ResponseWithError(w, "db ping", err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}

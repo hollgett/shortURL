@@ -23,14 +23,14 @@ func ResponseWithSuccess(w http.ResponseWriter, headerK, headerV, shLink string,
 		switch headerV {
 		case "application/json":
 			response := models.ResponseJSON{
-				ResponseURL: fmt.Sprintf("%s/%s", config.Cfg.BaseURL, shLink),
+				ResponseURL: fmt.Sprintf("%s/%s", config.Config.BaseURL, shLink),
 			}
 			if err := jsonutil.EncodeJSON(w, response); err != nil {
 				ResponseWithError(w, "json encode", err.Error(), http.StatusBadRequest)
 				return
 			}
 		default:
-			response := fmt.Sprintf("%s/%s", config.Cfg.BaseURL, shLink)
+			response := fmt.Sprintf("%s/%s", config.Config.BaseURL, shLink)
 			fmt.Fprint(w, response)
 		}
 		logger.LogInfo("response server", zap.String("data", shLink))

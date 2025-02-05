@@ -1,58 +1,26 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
-	"github.com/hollgett/shortURL.git/internal/config"
-	"github.com/hollgett/shortURL.git/internal/logger"
-	"go.uber.org/zap"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type DataStorage struct {
-	data        map[string]string
-	fileStorage bool
+	data map[string]string
 }
 
 func NewStorage() (Storage, error) {
 	ds := DataStorage{
 		data: make(map[string]string),
 	}
-	switch {
-	case config.Cfg.FileStorage == "":
-		ds.data = make(map[string]string)
-		return &ds, nil
-	default:
-		fStorage, err := newFileStorage(true)
-		if err != nil {
-			return nil, err
-		}
-		if err := fStorage.readFileStorage(&ds); err != nil {
-			return nil, err
-		}
-		if err := fStorage.close(); err != nil {
-			return nil, err
-		}
-		logger.LogInfo("file storage data", zap.Int("count", len(ds.data)))
-		return &ds, nil
-	}
-
+	return &ds, nil
 }
 
-func (ds *DataStorage) Save(shortLink, originURL string) {
-	if ds.fileStorage {
-		fStorage, err := newFileStorage(false)
-		if err != nil {
-			logger.LogInfo("open file error", zap.Error(err))
-		}
-		fStorage.dataFill(shortLink, originURL)
-		if err := fStorage.writeFileStorage(); err != nil {
-			logger.LogInfo("write file error", zap.Error(err))
-		}
-		if err := fStorage.close(); err != nil {
-			logger.LogInfo("close file error", zap.Error(err))
-		}
-	}
+func (ds *DataStorage) Save(shortLink, originURL string) error {
 	ds.data[shortLink] = originURL
+	return nil
 }
 
 func (ds *DataStorage) Find(shortLink string) (string, error) {
@@ -60,4 +28,12 @@ func (ds *DataStorage) Find(shortLink string) (string, error) {
 		return originURL, nil
 	}
 	return "", errors.New("the object does not exist in storage")
+}
+
+func (ds *DataStorage) Close() error {
+	return nil
+}
+
+func (ds *DataStorage) Ping(context.Context) error {
+	return nil
 }
