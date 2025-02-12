@@ -1,11 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/hollgett/shortURL.git/internal/config"
-	"github.com/hollgett/shortURL.git/internal/jsonutil"
 	"github.com/hollgett/shortURL.git/internal/logger"
 	"github.com/hollgett/shortURL.git/internal/models"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ func ResponseWithSuccess(w http.ResponseWriter, headerK, headerV, shLink string,
 			response := models.ResponseJSON{
 				ResponseURL: fmt.Sprintf("%s/%s", config.Config.BaseURL, shLink),
 			}
-			if err := jsonutil.EncodeJSON(w, response); err != nil {
+			if err := json.NewEncoder(w).Encode(response); err != nil {
 				ResponseWithError(w, "json encode", err.Error(), http.StatusBadRequest)
 				return
 			}

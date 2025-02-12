@@ -17,8 +17,9 @@ func setupRouters(handler *api.HandlerAPI) *chi.Mux {
 	r.Use(api.CompressMiddleware)
 	r.Post("/", handler.HandlePlainTextRequest)
 	r.Get("/ping", handler.Ping)
-	r.Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.HandleJSONRequest)
+	r.Route("/api/shorten", func(r chi.Router) {
+		r.Post("/", handler.HandleJSONRequest)
+		r.Post("/batch", handler.BatchReq)
 	})
 	r.Get("/{short}", handler.ShortURLGet)
 

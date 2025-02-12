@@ -10,6 +10,7 @@ require (
 	github.com/go-resty/resty/v2 v2.16.2
 	github.com/golang/mock v1.6.0
 	github.com/jackc/pgx/v5 v5.7.2
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 )

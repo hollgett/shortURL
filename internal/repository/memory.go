@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/hollgett/shortURL.git/internal/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -18,16 +19,24 @@ func NewStorage() (Storage, error) {
 	return &ds, nil
 }
 
-func (ds *DataStorage) Save(shortLink, originURL string) error {
+func (ds *DataStorage) Save(ctx context.Context, shortLink, originURL string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	ds.data[shortLink] = originURL
 	return nil
+
 }
 
-func (ds *DataStorage) Find(shortLink string) (string, error) {
+func (ds *DataStorage) Find(ctx context.Context, shortLink string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if originURL, ok := ds.data[shortLink]; ok {
 		return originURL, nil
 	}
 	return "", errors.New("the object does not exist in storage")
+
 }
 
 func (ds *DataStorage) Close() error {
@@ -35,5 +44,9 @@ func (ds *DataStorage) Close() error {
 }
 
 func (ds *DataStorage) Ping(context.Context) error {
+	return nil
+}
+
+func (ds *DataStorage) SaveBatch(data []models.DBBatch) error {
 	return nil
 }

@@ -78,23 +78,36 @@ func (fs *fileStorage) write(shortLink, originURL string) error {
 	return nil
 }
 
-func (fs *fileStorage) Save(shortLink, originURL string) error {
+func (fs *fileStorage) Save(ctx context.Context, shortLink, originURL string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	fs.data[shortLink] = originURL
 	if err := fs.write(shortLink, originURL); err != nil {
 		return err
 	}
 	return nil
 }
-func (fs *fileStorage) Find(shortLink string) (string, error) {
+func (fs *fileStorage) Find(ctx context.Context, shortLink string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if originURL, ok := fs.data[shortLink]; ok {
 		return originURL, nil
 	}
 	return "", errors.New("the object does not exist in storage")
 }
 
-func (fs *fileStorage) Ping(context.Context) error {
+func (fs *fileStorage) Ping(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, err := fs.file.Stat(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (fs *fileStorage) SaveBatch(data []models.DBBatch) error {
 	return nil
 }
