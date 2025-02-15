@@ -69,11 +69,28 @@ func clientShortener(originalURL string) error {
 }
 
 func clientShortenerJSON(originalURL string) error {
-	fmt.Printf("original url: %#v\n", originalURL)
+
 	client := NewClient()
-	request, err := json.Marshal(RequestJSON{
-		RequestURL: originalURL,
-	})
+	req := []RequestBatch{
+		RequestBatch{
+			Id:       "1",
+			Original: originalURL,
+		},
+		RequestBatch{
+			Id:       "2",
+			Original: originalURL,
+		},
+		RequestBatch{
+			Id:       "3",
+			Original: originalURL,
+		},
+		RequestBatch{
+			Id:       "4",
+			Original: originalURL,
+		},
+	}
+	fmt.Printf("original url: %#v\n", req)
+	request, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
@@ -88,7 +105,7 @@ func clientShortenerJSON(originalURL string) error {
 		SetHeader("Content-Type", "application/x-gzip").
 		SetHeader("Accept-Encoding", "gzip").
 		SetHeader("Content-Encoding", "gzip").
-		Post("/api/shorten")
+		Post("/api/shorten/batch")
 	if err != nil {
 		return fmt.Errorf("request post: %w", err)
 	}
@@ -104,24 +121,25 @@ func clientShortenerJSON(originalURL string) error {
 	if err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
-	response := ResponseJSON{}
+	response := []ResponseBatch{}
 	json.Unmarshal(br.Bytes(), &response)
 	fmt.Printf("status code post: %v \t short url: %#v\n", resp.StatusCode(), response)
-	shortURL, err := url.Parse(response.ResponseURL)
-	if err != nil {
-		return fmt.Errorf("parse url: %w", err)
-	}
-	fmt.Println(shortURL.Path)
-	resp, err = client.httpClient.R().Get(shortURL.Path)
-	if err != nil {
-		return fmt.Errorf("request get: %w", err)
-	}
-	fmt.Printf("status code get: %v\t\n", resp.StatusCode())
-	locationGet := resp.Header().Get("Location")
-	fmt.Printf("Location get: %s\r\n", locationGet)
-	if originalURL != locationGet {
-		return errors.New("original url and short response not equal")
-	}
+	fmt.Printf("%+v\n", response)
+	// shortURL, err := url.Parse(response.ResponseURL)
+	// if err != nil {
+	// 	return fmt.Errorf("parse url: %w", err)
+	// }
+	// fmt.Println(shortURL.Path)
+	// resp, err = client.httpClient.R().Get(shortURL.Path)
+	// if err != nil {
+	// 	return fmt.Errorf("request get: %w", err)
+	// }
+	// fmt.Printf("status code get: %v\t\n", resp.StatusCode())
+	// locationGet := resp.Header().Get("Location")
+	// fmt.Printf("Location get: %s\r\n", locationGet)
+	// if originalURL != locationGet {
+	// 	return errors.New("original url and short response not equal")
+	// }
 	return nil
 }
 
@@ -171,7 +189,7 @@ func main() {
 		return
 	}
 
-	if err := clientShortenerGzip(url); err != nil {
+	if err := clientShortenerJSON(url); err != nil {
 		fmt.Println(err)
 		return
 	}

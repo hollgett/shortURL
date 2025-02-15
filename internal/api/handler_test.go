@@ -28,8 +28,8 @@ func setupRouters(handler *HandlerAPI) *chi.Mux {
 func simulateMockServer(ctrl *gomock.Controller, createURL, getURL string, createError, getError error) *httptest.Server {
 	controller := mocks.NewMockShortenerHandler(ctrl)
 
-	controller.EXPECT().CreateShortURL(gomock.AssignableToTypeOf("")).Return(createURL, createError).AnyTimes()
-	controller.EXPECT().GetShortURL(gomock.AssignableToTypeOf("")).Return(getURL, getError).AnyTimes()
+	controller.EXPECT().CreateShortURL(gomock.Any(), gomock.AssignableToTypeOf("")).Return(createURL, createError).AnyTimes()
+	controller.EXPECT().GetShortURL(gomock.Any(), gomock.AssignableToTypeOf("")).Return(getURL, getError).AnyTimes()
 
 	api := NewHandlerAPI(controller)
 	rtr := setupRouters(api)
