@@ -87,7 +87,7 @@ func (sh *Shortener) Ping(ctx context.Context) error {
 	return sh.Repo.Ping(ctx)
 }
 
-func (sh *Shortener) ShortenBatch(original []models.RequestBatch) ([]models.ResponseBatch, error) {
+func (sh *Shortener) ShortenBatch(addr string, original []models.RequestBatch) ([]models.ResponseBatch, error) {
 	var dbData []models.DBBatch
 	for _, v := range original {
 		dbData = append(dbData, models.DBBatch{
@@ -103,7 +103,7 @@ func (sh *Shortener) ShortenBatch(original []models.RequestBatch) ([]models.Resp
 	for _, v := range dbData {
 		respData = append(respData, models.ResponseBatch{
 			CorrId: v.CorrId,
-			Short:  v.Short,
+			Short:  fmt.Sprintf("%s/%s", addr, v.Short),
 		})
 	}
 	return respData, nil

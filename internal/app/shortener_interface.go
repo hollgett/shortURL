@@ -11,6 +11,6 @@ type ShortenerHandler interface {
 	RandomID(ctx context.Context) string
 	CreateShortURL(ctx context.Context, requestData string) (string, error)
 	GetShortURL(ctx context.Context, pathURL string) (string, error)
-	ShortenBatch(original []models.RequestBatch) ([]models.ResponseBatch, error)
+	ShortenBatch(addr string, original []models.RequestBatch) ([]models.ResponseBatch, error)
 	Ping(ctx context.Context) error
 }

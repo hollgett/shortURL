@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/hollgett/shortURL.git/internal/models"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -48,5 +49,10 @@ func (ds *DataStorage) Ping(context.Context) error {
 }
 
 func (ds *DataStorage) SaveBatch(data []models.DBBatch) error {
+	for _, v := range data {
+		if err := ds.Save(context.TODO(), v.Short, v.Original); err != nil {
+			return fmt.Errorf("save error: %w", err)
+		}
+	}
 	return nil
 }

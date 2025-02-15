@@ -109,5 +109,10 @@ func (fs *fileStorage) Ping(ctx context.Context) error {
 }
 
 func (fs *fileStorage) SaveBatch(data []models.DBBatch) error {
+	for _, v := range data {
+		if err := fs.write(v.Short, v.Original); err != nil {
+			return fmt.Errorf("write file: %w", err)
+		}
+	}
 	return nil
 }

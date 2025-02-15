@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/hollgett/shortURL.git/internal/app"
+	"github.com/hollgett/shortURL.git/internal/config"
 	"github.com/hollgett/shortURL.git/internal/logger"
 	"github.com/hollgett/shortURL.git/internal/models"
 	"go.uber.org/zap"
@@ -41,7 +42,7 @@ func (h *HandlerAPI) HandlePlainTextRequest(w http.ResponseWriter, r *http.Reque
 		ResponseWithError(w, "CreateShortURL", err.Error(), http.StatusBadRequest)
 		return
 	}
-	ResponseWithSuccess(w, "Content-Type", "text/plain", shLink, http.StatusCreated)
+	ResponseWithSuccessText(w, shLink, http.StatusCreated)
 }
 
 func (h *HandlerAPI) HandleJSONRequest(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +58,7 @@ func (h *HandlerAPI) HandleJSONRequest(w http.ResponseWriter, r *http.Request) {
 		ResponseWithError(w, "CreateShortURL", err.Error(), http.StatusBadRequest)
 		return
 	}
-	ResponseWithSuccess(w, "Content-Type", "application/json", shLink, http.StatusCreated)
+	ResponseWithSuccessJSON(w, shLink, http.StatusCreated)
 }
 
 // processing post request
@@ -66,13 +67,12 @@ func (h *HandlerAPI) ShortURLGet(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	//search exist short url and return original URL
 	short := chi.URLParam(r, "short")
-	logger.Log.Info("--------------",zap.Any("dsada",short))
 	originalURL, err := h.ShortenerService.GetShortURL(ctx, short)
 	if err != nil {
 		ResponseWithError(w, "ShortURLGet", err.Error(), http.StatusBadRequest)
 		return
 	}
-	ResponseWithSuccess(w, "Location", originalURL, "", http.StatusTemporaryRedirect)
+	ResponseWithSuccessGet(w, originalURL)
 }
 
 func (h *HandlerAPI) Ping(w http.ResponseWriter, r *http.Request) {
@@ -86,22 +86,18 @@ func (h *HandlerAPI) Ping(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HandlerAPI) BatchReq(w http.ResponseWriter, r *http.Request) {
-	var Data []models.RequestBatch
-	if err := json.NewDecoder(r.Body).Decode(&Data); err != nil {
+	var batchData []models.RequestBatch
+	if err := json.NewDecoder(r.Body).Decode(&batchData); err != nil {
 		ResponseWithError(w, "decoder body", err.Error(), http.StatusBadRequest)
 		return
 	}
-	logger.Log.Info("TEST", zap.Any("value", Data))
+	logger.LogInfo("data batch", zap.Int("len", len(batchData)))
 
-	respData, err := h.ShortenerService.ShortenBatch(Data)
+	respData, err := h.ShortenerService.ShortenBatch(config.Config.BaseURL, batchData)
 	if err != nil {
 		ResponseWithError(w, "shorten batch body", err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logger.Log.Info("TEST", zap.Any("value", respData))
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(respData); err != nil {
-		logger.Log.Info("encoder BatchReq", zap.Error(err))
-	}
+	logger.Log.Info("data batch resp", zap.Int("len", len(respData)))
+	ResponseWithSuccessBatch(w, respData)
 }

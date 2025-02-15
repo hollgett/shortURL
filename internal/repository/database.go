@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/hollgett/shortURL.git/internal/logger"
@@ -79,11 +80,18 @@ func (pg *postgresDB) Find(ctx context.Context, shortLink string) (string, error
 	return origURL, nil
 }
 func (pg *postgresDB) Close() error {
-	errSave := pg.stmtSave.Close()
-	errFind := pg.stmtFind.Close()
-	err := pg.db.Close()
+	var errs []error
+	if err := pg.stmtSave.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("save stmt close: %w", err))
+	}
+	if err := pg.stmtFind.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("find stmt close: %w", err))
+	}
+	if err := pg.db.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("db close: %w", err))
+	}
 	logger.LogInfo("close db")
-	return errors.Join(err, errSave, errFind)
+	return errors.Join(errs...)
 }
 
 func (pg *postgresDB) Ping(rCtx context.Context) error {

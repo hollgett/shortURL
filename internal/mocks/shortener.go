@@ -94,16 +94,16 @@ func (mr *MockShortenerHandlerMockRecorder) RandomID(ctx interface{}) *gomock.Ca
 }
 
 // ShortenBatch mocks base method.
-func (m *MockShortenerHandler) ShortenBatch(original []models.RequestBatch) ([]models.ResponseBatch, error) {
+func (m *MockShortenerHandler) ShortenBatch(addr string, original []models.RequestBatch) ([]models.ResponseBatch, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShortenBatch", original)
+	ret := m.ctrl.Call(m, "ShortenBatch", addr, original)
 	ret0, _ := ret[0].([]models.ResponseBatch)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ShortenBatch indicates an expected call of ShortenBatch.
-func (mr *MockShortenerHandlerMockRecorder) ShortenBatch(original interface{}) *gomock.Call {
+func (mr *MockShortenerHandlerMockRecorder) ShortenBatch(addr, original interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShortenBatch", reflect.TypeOf((*MockShortenerHandler)(nil).ShortenBatch), original)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShortenBatch", reflect.TypeOf((*MockShortenerHandler)(nil).ShortenBatch), addr, original)
 }
